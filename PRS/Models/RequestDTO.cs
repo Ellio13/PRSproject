@@ -8,6 +8,7 @@ namespace PRS.Models
         public string Description { get; set; }
         public string Justification { get; set; }
         public DateTime DateNeeded { get; set; }
+        public string Status { get; set; }
         public string DeliveryMode { get; set; }
 
         [JsonIgnore] // Exclude from Swagger and serialization

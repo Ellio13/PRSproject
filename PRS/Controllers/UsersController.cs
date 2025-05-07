@@ -104,5 +104,23 @@ namespace PRS.Controllers
         {
             return _context.Users.Any(e => e.Id == id);
         }
+
+        [HttpPost("login")]
+        public ActionResult<User> GetPassword([FromBody] UserLoginDTO userlogin)
+        {
+            // Use FirstOrDefault to retrieve a single user or null
+            var user = _context.Users.FirstOrDefault(u => u.UserName == userlogin.Username && u.Password == userlogin.Password);
+
+            if (user == null)
+            {
+                // Return 404 Not Found if no user matches the credentials
+                return NotFound("Username and password not found");
+            }
+
+            // Return 200 OK with the user if found
+            return Ok(user);
+        }
+
     }
+
 }

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PRS.Models;
+using static PRS.Models.VendorDTO;
 
 namespace PRS.Controllers
 {
@@ -73,14 +74,43 @@ namespace PRS.Controllers
         }
 
         // POST: api/Vendor  add vendor by id
+    
         [HttpPost]
-        public async Task<ActionResult<Vendor>> PostVendor(Vendor vendor)
+        public async Task<ActionResult<Vendor>> PostVendor(VendorDTO vendorDto)
         {
+            // Validate the input
+            if (vendorDto == null ||
+                string.IsNullOrWhiteSpace(vendorDto.Name) ||
+                string.IsNullOrWhiteSpace(vendorDto.Address) ||
+                string.IsNullOrWhiteSpace(vendorDto.City) ||
+                string.IsNullOrWhiteSpace(vendorDto.State) ||
+                string.IsNullOrWhiteSpace(vendorDto.Zip) ||
+                string.IsNullOrWhiteSpace(vendorDto.Code))
+            {
+                return BadRequest("All fields (name, address, city, state, zip, and code) are required.");
+            }
+
+            // Create a new Vendor entity
+            var vendor = new Vendor
+            {
+                Name = vendorDto.Name,
+                Address = vendorDto.Address,
+                City = vendorDto.City,
+                State = vendorDto.State,
+                Zip = vendorDto.Zip,
+                Code = vendorDto.Code
+            };
+
+            // Add the vendor to the database
             _context.Vendors.Add(vendor);
             await _context.SaveChangesAsync();
 
+            // Return the created vendor
             return CreatedAtAction("GetVendor", new { id = vendor.Id }, vendor);
         }
+
+
+
 
         // DELETE: api/Vendors/{id}  delete vendor by id
         [HttpDelete("{id}")]

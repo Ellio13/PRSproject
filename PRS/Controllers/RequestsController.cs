@@ -93,26 +93,19 @@ namespace PRS.Controllers
             return Ok(reviewRequests);
         }
 
-        [HttpPut("approve/{id}")]
-        public async Task<IActionResult> ApproveRequest(int id, [FromQuery] int userId)
+        
+        //this approves any request without checking to see if the user is an 
+        //admin.  Trying it out for review testing, but prefer following version.
+        //Neither one works right now.  
+
+        [HttpPut("approve/{requestId}")]
+        public async Task<IActionResult> ApproveRequest(int requestId)
         {
-            // Validate the user exists and has admin privileges
-            var user = await _context.Users.FindAsync(userId);
-            if (user == null)
-            {
-                return NotFound($"User with ID {userId} not found.");
-            }
-
-            if (!user.Admin)
-            {
-                return Unauthorized("Only administrators can approve requests.");
-            }
-
             // Find the request by ID
-            var request = await _context.Requests.FindAsync(id);
+            var request = await _context.Requests.FindAsync(requestId);
             if (request == null)
             {
-                return NotFound($"Request with ID {id} not found.");
+                return NotFound($"Request with ID {requestId} not found.");
             }
 
             // Update the request status to "Approved"
@@ -122,13 +115,51 @@ namespace PRS.Controllers
             // Save changes to the database
             await _context.SaveChangesAsync();
 
-            return Ok(request); // Return the updated request
+            // Return the updated request
+            return Ok(request);
         }
 
 
+        //This section checks to see if user is an admin before they can approve requests
+        //need to check with Admin to see what they want here
+        //
+        //[HttpPut("approve/{requestId}")]
+        //public async Task<IActionResult> ApproveRequest(int requestId, [FromQuery] int userId)
+        //{
+        //    // Validate the user exists and has admin privileges
+        //    var user = await _context.Users.FindAsync(userId);
+        //    if (user == null)
+        //    {
+        //        return NotFound($"User with ID {userId} not found.");
+        //    }
 
-        // PUT: api/Requests/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        //    if (!user.Admin)
+        //    {
+        //        return Unauthorized("Only administrators can approve requests.");
+        //    }
+
+        //    // Find the request by ID
+        //    var request = await _context.Requests.FindAsync(requestId);
+        //    if (request == null)
+        //    {
+        //        return NotFound($"Request with ID {requestId} not found.");
+        //    }
+
+        //    // Update the request status to "Approved"
+        //    request.Status = "Approved";
+        //    _context.Entry(request).State = EntityState.Modified;
+
+        //    // Save changes to the database
+        //    await _context.SaveChangesAsync();
+
+        //    return Ok(request); // Return the updated request
+        //}
+
+
+
+
+        // PUT: api/Requests/{id}
+      
         [HttpPut("{id}")]
         public async Task<IActionResult> PutRequest(int id, Request request)
         {
@@ -201,59 +232,55 @@ namespace PRS.Controllers
 
         // POST: api/Requests
         [HttpPost]
-        public async Task<ActionResult<Request>> PostRequest(List<RequestDTO> requestDtos)
+        public async Task<ActionResult<Request>> PostRequest(RequestDTO requestDto)
         {
-            if (requestDtos == null || !requestDtos.Any())
+            if (requestDto == null)
             {
-                return BadRequest("No requests provided.");
+                return BadRequest("Request data is required.");
             }
 
-            // Use the first entry in the list to create the Request
-            var firstRequestDto = requestDtos.First();
+            // Create a new Request entity from the provided RequestDTO
             var request = new Request
             {
-                UserId = firstRequestDto.UserId,
-                Description = firstRequestDto.Description,
-                Justification = firstRequestDto.Justification,
-                DateNeeded = firstRequestDto.DateNeeded,
-                DeliveryMode = firstRequestDto.DeliveryMode,
-                Status = "NEW", // Default status
-                Total = 0,      // Default total (will be updated later)
+                UserId = requestDto.UserId,
+                Description = requestDto.Description,
+                Justification = requestDto.Justification,
+                DateNeeded = requestDto.DateNeeded,
+                DeliveryMode = requestDto.DeliveryMode,
+                Status = requestDto.Status ?? "NEW", // if nothing here, then defaults to "NEW"
+                Total = 0, // Default total (will be updated later)
                 SubmittedDate = DateTime.Now, // Default submitted date
-                RequestNumber = GetNextRequestNumber() // Generate the next request number
+                RequestNumber = GetNextRequestNumber() // Helper method to generate request number
             };
 
             // Add the Request to the database
             _context.Requests.Add(request);
             await _context.SaveChangesAsync(); // Save to generate the RequestId
 
-            // Use the same RequestId for all entries
-            foreach (var requestDto in requestDtos)
+            // Process LineItems if provided
+            if (requestDto.LineItems != null)
             {
-                if (requestDto.LineItems != null)
+                foreach (var lineItemDto in requestDto.LineItems)
                 {
-                    foreach (var lineItemDto in requestDto.LineItems)
+                    var product = await _context.Products.FindAsync(lineItemDto.ProductId);
+                    if (product == null)
                     {
-                        var product = await _context.Products.FindAsync(lineItemDto.ProductId);
-                        if (product == null)
-                        {
-                            return BadRequest($"Product with ID {lineItemDto.ProductId} does not exist.");
-                        }
-
-                        if (product.Price <= 0)
-                        {
-                            return BadRequest($"Product with ID {lineItemDto.ProductId} has an invalid price.");
-                        }
-
-                        var lineItem = new LineItem
-                        {
-                            ProductId = lineItemDto.ProductId,
-                            Quantity = lineItemDto.Quantity,
-                            RequestId = request.Id // Use the generated RequestId
-                        };
-
-                        _context.LineItems.Add(lineItem);
+                        return BadRequest($"Product with ID {lineItemDto.ProductId} does not exist.");
                     }
+
+                    if (product.Price <= 0)
+                    {
+                        return BadRequest($"Product with ID {lineItemDto.ProductId} has an invalid price.");
+                    }
+
+                    var lineItem = new LineItem
+                    {
+                        ProductId = lineItemDto.ProductId,
+                        Quantity = lineItemDto.Quantity,
+                        RequestId = request.Id // Use the generated RequestId
+                    };
+
+                    _context.LineItems.Add(lineItem);
                 }
             }
 
@@ -271,28 +298,23 @@ namespace PRS.Controllers
 
 
 
-        // Helper method to generate the next request number
         private string GetNextRequestNumber()
         {
             // Request number format: RYYMMDDXXXX
-            string requestNbr = "R";
+            string requestNbr = "R" + DateOnly.FromDateTime(DateTime.Now).ToString("yyMMdd");
 
-            // Add YYMMDD string
-            DateOnly today = DateOnly.FromDateTime(DateTime.Now);
-            requestNbr += today.ToString("yyMMdd");
-
-            // Get the maximum request number from the database
+            // Get the maximum request number that starts with today's date
             string? maxReqNbr = _context.Requests
                 .Where(r => r.RequestNumber != null && r.RequestNumber.StartsWith(requestNbr))
                 .Max(r => r.RequestNumber);
 
             string reqNbr;
-            if (maxReqNbr != null)
+            if (maxReqNbr != null && maxReqNbr.Length == 11)
             {
                 // Extract the last 4 digits, increment, and pad with leading zeros
                 string tempNbr = maxReqNbr.Substring(7);
                 int nbr = int.Parse(tempNbr) + 1;
-                reqNbr = nbr.ToString().PadLeft(4, '0');
+                reqNbr = nbr.ToString().PadLeft(4, '0'); // Ensures 4-digit padding
             }
             else
             {
@@ -300,11 +322,11 @@ namespace PRS.Controllers
                 reqNbr = "0001";
             }
 
-            requestNbr += reqNbr;
+        requestNbr += reqNbr;
             return requestNbr;
         }
 
-        // Calculate total helper method
+        // Calculate total for request - helper method
         private decimal CalculateTotal(int requestId)
         {
             // Calculate the total using a single query
@@ -321,13 +343,7 @@ namespace PRS.Controllers
 
 
 
-        //_context.Requests.Add(request);
-        //    await _context.SaveChangesAsync();
-
-        //    return CreatedAtAction("GetRequest", new { id = request.Id }, request);
-        //}
-
-        // DELETE: api/Requests/5
+        // DELETE: api/Requests/
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteRequest(int id)
         {
@@ -348,24 +364,26 @@ namespace PRS.Controllers
             return _context.Requests.Any(e => e.Id == id);
         }
 
-        [HttpPost("login")]
-        public ActionResult<User> GetPassword([FromBody] UserLoginDTO userlogin)
-        {
-            // Use FirstOrDefault to retrieve a single user or null
-            var user = _context.Users.FirstOrDefault(u => u.UserName == userlogin.Username && u.Password == userlogin.Password);
 
-            if (user == null)
-            {
-                // Return 404 Not Found if no user matches the credentials
-                return NotFound("Username and password not found");
-            }
+        //Post api/requests/login checks username and password
+        //[HttpPost("login")]
+        //public ActionResult<User> GetPassword([FromBody] UserLoginDTO userlogin)
+        //{
+        //    // Use FirstOrDefault to retrieve a single user or null
+        //    var user = _context.Users.FirstOrDefault(u => u.UserName == userlogin.Username && u.Password == userlogin.Password);
 
-            // Return 200 OK with the user if found
-            return Ok(user);
-        }
+        //    if (user == null)
+        //    {
+        //        // Return 404 Not Found if no user matches the credentials
+        //        return NotFound("Username and password not found");
+        //    }
+
+        //    // Return 200 OK with the user if found
+        //    return Ok(user);
+        //}
 
     }
 }
    
 // use post body to get the username and password.  From body only accepts a single object
-//define the object (class UserLoginDTO) with the properties Username and Password
+//define the object (class UserLoginDTO - file DTOlogin) with the properties Username and Password
