@@ -4,7 +4,11 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
+
 namespace PRS.Models;
+
+//all of these are VARCHAR instead of NVARCHAR in sql so add [Unicode(false)] to prevent
+//migration issues
 
 [Table("Vendor")]
 public partial class Vendor
@@ -39,13 +43,16 @@ public partial class Vendor
 
     [StringLength(12)]
     [Unicode(false)]
-    public string PhoneNumber { get; set; } = null!;
+    public string? PhoneNumber { get; set; } = null;
 
     [StringLength(100)]
     [Unicode(false)]
-    public string Email { get; set; } = null!;
-}
-    //directives were to delete the following
-    //[InverseProperty("Vendor")]
-    //public virtual ICollection<Product> Products { get; set; } = new List<Product>();
+    public string? Email { get; set; } = null;
+};
+
+
+
+//directives were to delete the following
+//[InverseProperty("Vendor")]
+//public virtual ICollection<Product> Products { get; set; } = new List<Product>();
 

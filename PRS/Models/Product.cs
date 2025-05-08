@@ -37,6 +37,7 @@ public partial class Product
 
 }
 
+    //these are not needed
     //[InverseProperty("Product")]
     //public virtual ICollection<LineItem> LineItems { get; set; } = new List<LineItem>();
 

@@ -15,10 +15,11 @@ namespace PRS.Models
         public List<LineItemDTO> LineItems { get; set; } = new List<LineItemDTO>();
     }
 
-    public class RejectRequestDTO
-    {
-        public string ReasonForRejection { get; set; }
-    }
+    //no longer needed because user only needs to pass in a string, not an object
+    //public class RejectRequestDTO
+    //{
+    //    public string ReasonForRejection { get; set; }
+    //}
 
 
 }

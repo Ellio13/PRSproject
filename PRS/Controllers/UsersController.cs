@@ -9,7 +9,7 @@ using PRS.Models;
 
 namespace PRS.Controllers
 {
-    // users controller with address api/users
+    // users controller with address api/users.  Pulls from User table
     [Route("api/[controller]")]
     [ApiController]
     public class UsersController : ControllerBase
@@ -28,7 +28,7 @@ namespace PRS.Controllers
             return await _context.Users.ToListAsync();
         }
 
-        // GET: api/Users/5
+        // GET: api/Users/  return all users
         [HttpGet("{id}")]
         public async Task<ActionResult<User>> GetUser(int id)
         {
@@ -42,8 +42,7 @@ namespace PRS.Controllers
             return user;
         }
 
-        // PUT: api/Users/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        // PUT: api/Users/{id}  update users by id
         [HttpPut("{id}")]
         public async Task<IActionResult> PutUser(int id, User user)
         {
@@ -73,8 +72,7 @@ namespace PRS.Controllers
             return NoContent();
         }
 
-        // POST: api/Users
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        // POST: api/Users  create new users
         [HttpPost]
         public async Task<ActionResult<User>> PostUser(User user)
         {
@@ -84,7 +82,7 @@ namespace PRS.Controllers
             return CreatedAtAction("GetUser", new { id = user.Id }, user);
         }
 
-        // DELETE: api/Users/5
+        // DELETE: api/Users/{id}  delete users
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteUser(int id)
         {
@@ -105,6 +103,8 @@ namespace PRS.Controllers
             return _context.Users.Any(e => e.Id == id);
         }
 
+        
+        //login for users
         [HttpPost("login")]
         public ActionResult<User> GetPassword([FromBody] UserLoginDTO userlogin)
         {

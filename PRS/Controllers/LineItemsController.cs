@@ -60,24 +60,30 @@ namespace PRS.Controllers
             return Ok(lineItems);
         }
 
-        // PUT: api/LineItems/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutLineItem(int id, LineItem lineItem)
+        public async Task<IActionResult> PutLineItem(int id, [FromBody] LineItemDTO lineItemDto)
         {
-            if (id != lineItem.Id)
+            // Find the existing line item by ID
+            var lineItem = await _context.LineItems.FindAsync(id);
+            if (lineItem == null)
             {
-                return BadRequest("Line item ID mismatch.");
+                return NotFound($"Line item with ID {id} not found.");
             }
 
-            // Mark the line item as modified.
+            // Update the line item with values from the DTO
+            lineItem.RequestId = lineItemDto.RequestId;
+            lineItem.ProductId = lineItemDto.ProductId;
+            lineItem.Quantity = lineItemDto.Quantity;
+
+            // Mark the line item as modified
             _context.Entry(lineItem).State = EntityState.Modified;
 
             try
             {
-                // Update the line item.
+                // Save changes to the line item
                 await _context.SaveChangesAsync();
 
-                // After successfully updating, recalculate the total for the associated request.
+                // Recalculate the total for the associated request
                 var request = await _context.Requests.FindAsync(lineItem.RequestId);
                 if (request != null)
                 {
@@ -97,8 +103,14 @@ namespace PRS.Controllers
                     throw;
                 }
             }
+
             return NoContent();
         }
+
+
+
+
+
 
         private bool LineItemExists(int id)
         {

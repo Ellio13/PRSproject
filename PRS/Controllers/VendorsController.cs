@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PRS.Models;
-using static PRS.Models.VendorDTO;
+
 
 namespace PRS.Controllers
 {
@@ -44,6 +44,10 @@ namespace PRS.Controllers
         }
 
         // PUT: api/Vendors/{id}  edit vendor by id
+        //this try catch concurrency exception does not consistently appear
+        //in my code.  It would be better to have consistency and it's not necessary
+        //for the scale of this project, but it's here for now as an example
+
         [HttpPut("{id}")]
         public async Task<IActionResult> PutVendor(int id, Vendor vendor)
         {
@@ -74,32 +78,20 @@ namespace PRS.Controllers
         }
 
         // POST: api/Vendor  add vendor by id
-    
         [HttpPost]
-        public async Task<ActionResult<Vendor>> PostVendor(VendorDTO vendorDto)
+        public async Task<ActionResult<Vendor>> PostVendor(Vendor vendor)
         {
             // Validate the input
-            if (vendorDto == null ||
-                string.IsNullOrWhiteSpace(vendorDto.Name) ||
-                string.IsNullOrWhiteSpace(vendorDto.Address) ||
-                string.IsNullOrWhiteSpace(vendorDto.City) ||
-                string.IsNullOrWhiteSpace(vendorDto.State) ||
-                string.IsNullOrWhiteSpace(vendorDto.Zip) ||
-                string.IsNullOrWhiteSpace(vendorDto.Code))
+            if (vendor == null ||
+                string.IsNullOrWhiteSpace(vendor.Name) ||
+                string.IsNullOrWhiteSpace(vendor.Address) ||
+                string.IsNullOrWhiteSpace(vendor.City) ||
+                string.IsNullOrWhiteSpace(vendor.State) ||
+                string.IsNullOrWhiteSpace(vendor.Zip) ||
+                string.IsNullOrWhiteSpace(vendor.Code))
             {
-                return BadRequest("All fields (name, address, city, state, zip, and code) are required.");
+                return BadRequest("Name, address, city, state, zip, and code are required.");
             }
-
-            // Create a new Vendor entity
-            var vendor = new Vendor
-            {
-                Name = vendorDto.Name,
-                Address = vendorDto.Address,
-                City = vendorDto.City,
-                State = vendorDto.State,
-                Zip = vendorDto.Zip,
-                Code = vendorDto.Code
-            };
 
             // Add the vendor to the database
             _context.Vendors.Add(vendor);
@@ -108,7 +100,6 @@ namespace PRS.Controllers
             // Return the created vendor
             return CreatedAtAction("GetVendor", new { id = vendor.Id }, vendor);
         }
-
 
 
 

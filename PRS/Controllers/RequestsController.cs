@@ -21,14 +21,14 @@ namespace PRS.Controllers
             _context = context;
         }
 
-        // GET: api/Requests
+        // GET: api/Requests  generic get
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Request>>> GetRequests()
         {
             return await _context.Requests.ToListAsync();
         }
 
-        // GET: api/Requests/5
+        // GET: api/Requests/{id}  get requests by id
         [HttpGet("{id}")]
         public async Task<ActionResult<Request>> GetRequest(int id)
         {
@@ -42,31 +42,42 @@ namespace PRS.Controllers
             return request;
         }
 
-        [HttpGet("submit-review/{userId}")]
-        public async Task<IActionResult> SubmitReview(int userId)
+
+        //submit requests for review by requestID
+        [HttpPut("submit-review/{requestId}")] 
+        public async Task<IActionResult> SubmitReview(int requestId)
         {
             // Retrieve all requests for the specified user.
             var requests = await _context.Requests
-                .Where(r => r.UserId == userId)
+                .Where(r => r.Id == requestId)
                 .ToListAsync();
 
             if (requests == null || !requests.Any())
             {
-                return NotFound($"No requests found for user with ID {userId}.");
+                return NotFound($"No requests found for user with ID {requestId}.");
             }
 
             // Loop through each request and update the status based on its total.
             foreach (var request in requests)
             {
-                // Using GetValueOrDefault in case Total is null.
+                // Ensure Total is calculated if it's null
+                if (request.Total == null)
+                {
+                    request.Total = CalculateTotal(request.Id);
+                }
+
+                // Set status based on Total
                 if (request.Total.GetValueOrDefault() <= 50m)
                 {
-                    request.Status = "Approved";
+                    request.Status = "APPROVED";
                 }
                 else
                 {
-                    request.Status = "Review";
+                    request.Status = "REVIEW";
                 }
+
+                // Update the submitted date to today's date
+                request.SubmittedDate = DateTime.Now;
                 _context.Entry(request).State = EntityState.Modified;
             }
 
@@ -77,12 +88,14 @@ namespace PRS.Controllers
             return Ok(requests);
         }
 
+
+        //get a list of requests in review status
         [HttpGet("list-review/{id}")]
         public async Task<ActionResult<IEnumerable<Request>>> ListReview(int id)
         {
             // Retrieve all requests with "Review" status, excluding those with the same UserId as the provided id.
             var reviewRequests = await _context.Requests
-                .Where(r => r.Status == "Review" && r.UserId != id)
+                .Where(r => r.Status == "REVIEW" && r.UserId != id)
                 .ToListAsync();
 
             if (!reviewRequests.Any())
@@ -93,11 +106,9 @@ namespace PRS.Controllers
             return Ok(reviewRequests);
         }
 
-        
-        //this approves any request without checking to see if the user is an 
-        //admin.  Trying it out for review testing, but prefer following version.
-        //Neither one works right now.  
 
+        
+        //approve requests by id
         [HttpPut("approve/{requestId}")]
         public async Task<IActionResult> ApproveRequest(int requestId)
         {
@@ -109,7 +120,7 @@ namespace PRS.Controllers
             }
 
             // Update the request status to "Approved"
-            request.Status = "Approved";
+            request.Status = "APPROVED";
             _context.Entry(request).State = EntityState.Modified;
 
             // Save changes to the database
@@ -121,7 +132,7 @@ namespace PRS.Controllers
 
 
         //This section checks to see if user is an admin before they can approve requests
-        //need to check with Admin to see what they want here
+        //not in specs, but would be good to add
         //
         //[HttpPut("approve/{requestId}")]
         //public async Task<IActionResult> ApproveRequest(int requestId, [FromQuery] int userId)
@@ -158,8 +169,10 @@ namespace PRS.Controllers
 
 
 
-        // PUT: api/Requests/{id}
-      
+
+        // PUT: api/Requests/{id}  update requests by ID
+        // with concurrency exception that isn't necessary for specs
+
         [HttpPut("{id}")]
         public async Task<IActionResult> PutRequest(int id, Request request)
         {
@@ -189,23 +202,13 @@ namespace PRS.Controllers
             return NoContent();
         }
 
+
+        //  api/Requests/reject/{id}  reject requests by ID
         [HttpPut("reject/{id}")]
-        public async Task<IActionResult> RejectRequest(int id, [FromQuery] int userId, [FromBody] RejectRequestDTO rejectRequestDto)
+        public async Task<ActionResult> RejectRequest(int id, [FromBody] string reason)
         {
-            // Validate the user exists and has admin privileges
-            var user = await _context.Users.FindAsync(userId);
-            if (user == null)
-            {
-                return NotFound($"User with ID {userId} not found.");
-            }
-
-            if (!user.Admin)
-            {
-                return Unauthorized("Only administrators can reject requests.");
-            }
-
             // Validate the reason for rejection
-            if (string.IsNullOrWhiteSpace(rejectRequestDto.ReasonForRejection))
+            if (string.IsNullOrWhiteSpace(reason))
             {
                 return BadRequest("Reason for rejection is required.");
             }
@@ -218,19 +221,22 @@ namespace PRS.Controllers
             }
 
             // Update the request status to "Rejected" and set the reason for rejection
-            request.Status = "Rejected";
-            request.ReasonForRejection = rejectRequestDto.ReasonForRejection;
+            request.Status = "REJECTED";
+            request.ReasonForRejection = reason;
             _context.Entry(request).State = EntityState.Modified;
 
             // Save changes to the database
             await _context.SaveChangesAsync();
 
-            return Ok(request); // Return the updated request
+            // Return the updated request
+            return Ok(request);
         }
 
 
+      
 
-        // POST: api/Requests
+
+        // POST: api/Requests  submit new purchase requests
         [HttpPost]
         public async Task<ActionResult<Request>> PostRequest(RequestDTO requestDto)
         {
@@ -297,13 +303,13 @@ namespace PRS.Controllers
         }
 
 
-
+        //helper method to create the request number with R + date + 0001 ++
         private string GetNextRequestNumber()
         {
             // Request number format: RYYMMDDXXXX
             string requestNbr = "R" + DateOnly.FromDateTime(DateTime.Now).ToString("yyMMdd");
 
-            // Get the maximum request number that starts with today's date
+            // Get the maximum request number so far for the current date
             string? maxReqNbr = _context.Requests
                 .Where(r => r.RequestNumber != null && r.RequestNumber.StartsWith(requestNbr))
                 .Max(r => r.RequestNumber);
@@ -322,14 +328,14 @@ namespace PRS.Controllers
                 reqNbr = "0001";
             }
 
-        requestNbr += reqNbr;
+            requestNbr += reqNbr;
             return requestNbr;
         }
 
         // Calculate total for request - helper method
         private decimal CalculateTotal(int requestId)
         {
-            // Calculate the total using a single query
+            // Calculate the total using one query
             return _context.LineItems
                 .Where(li => li.RequestId == requestId)
                 .Join(
@@ -340,7 +346,6 @@ namespace PRS.Controllers
                 )
                 .Sum();
         }
-
 
 
         // DELETE: api/Requests/
@@ -364,26 +369,5 @@ namespace PRS.Controllers
             return _context.Requests.Any(e => e.Id == id);
         }
 
-
-        //Post api/requests/login checks username and password
-        //[HttpPost("login")]
-        //public ActionResult<User> GetPassword([FromBody] UserLoginDTO userlogin)
-        //{
-        //    // Use FirstOrDefault to retrieve a single user or null
-        //    var user = _context.Users.FirstOrDefault(u => u.UserName == userlogin.Username && u.Password == userlogin.Password);
-
-        //    if (user == null)
-        //    {
-        //        // Return 404 Not Found if no user matches the credentials
-        //        return NotFound("Username and password not found");
-        //    }
-
-        //    // Return 200 OK with the user if found
-        //    return Ok(user);
-        //}
-
     }
 }
-   
-// use post body to get the username and password.  From body only accepts a single object
-//define the object (class UserLoginDTO - file DTOlogin) with the properties Username and Password
