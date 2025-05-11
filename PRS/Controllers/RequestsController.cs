@@ -43,49 +43,37 @@ namespace PRS.Controllers
         }
 
 
-        //submit requests for review by requestID
-        [HttpPut("submit-review/{requestId}")] 
+// Submit request for review by requestID
+[HttpPut("submit-review/{requestId}")]
         public async Task<IActionResult> SubmitReview(int requestId)
         {
-            // Retrieve all requests for the specified user.
-            var requests = await _context.Requests
-                .Where(r => r.Id == requestId)
-                .ToListAsync();
+            // Retrieve the specific request by ID
+            var request = await _context.Requests.FindAsync(requestId);
 
-            if (requests == null || !requests.Any())
+            if (request == null)
             {
-                return NotFound($"No requests found for user with ID {requestId}.");
+                return NotFound($"Request with ID {requestId} not found.");
             }
 
-            // Loop through each request and update the status based on its total.
-            foreach (var request in requests)
+            // Set status based on Total
+            if (request.Total.GetValueOrDefault() <= 50m)
             {
-                // Ensure Total is calculated if it's null
-                if (request.Total == null)
-                {
-                    request.Total = CalculateTotal(request.Id);
-                }
-
-                // Set status based on Total
-                if (request.Total.GetValueOrDefault() <= 50m)
-                {
-                    request.Status = "APPROVED";
-                }
-                else
-                {
-                    request.Status = "REVIEW";
-                }
-
-                // Update the submitted date to today's date
-                request.SubmittedDate = DateTime.Now;
-                _context.Entry(request).State = EntityState.Modified;
+                request.Status = "APPROVED";
+            }
+            else
+            {
+                request.Status = "REVIEW";
             }
 
-            // Save the updates to the database.
+            // Update the submitted date to today's date
+            request.SubmittedDate = DateTime.Now;
+            _context.Entry(request).State = EntityState.Modified;
+
+            // Save the updates to the database
             await _context.SaveChangesAsync();
 
-            // Return the updated requests.
-            return Ok(requests);
+            // Return the updated request
+            return Ok(request);
         }
 
 
@@ -287,14 +275,15 @@ namespace PRS.Controllers
                     };
 
                     _context.LineItems.Add(lineItem);
+
+                    request.Total += product.Price * lineItemDto.Quantity; // Update the total for the request
                 }
             }
 
             // Save all LineItems to the database
             await _context.SaveChangesAsync();
 
-            // Calculate and update the total for the request
-            request.Total = CalculateTotal(request.Id); // Use the helper method to calculate the total
+            // save the request with the new total
             _context.Entry(request).State = EntityState.Modified;
             await _context.SaveChangesAsync();
 
@@ -331,22 +320,6 @@ namespace PRS.Controllers
             requestNbr += reqNbr;
             return requestNbr;
         }
-
-        // Calculate total for request - helper method
-        private decimal CalculateTotal(int requestId)
-        {
-            // Calculate the total using one query
-            return _context.LineItems
-                .Where(li => li.RequestId == requestId)
-                .Join(
-                    _context.Products,
-                    lineItem => lineItem.ProductId,
-                    product => product.Id,
-                    (lineItem, product) => product.Price * lineItem.Quantity
-                )
-                .Sum();
-        }
-
 
         // DELETE: api/Requests/
         [HttpDelete("{id}")]
